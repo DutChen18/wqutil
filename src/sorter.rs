@@ -57,7 +57,10 @@ pub fn find_deltas(images: &Arc<Vec<ImageBuffer<Rgb<f32>, Vec<f32>>>>, indices: 
         let pairs = pairs.clone();
 
         handles.push(std::thread::spawn(move || {
-            while let Some(pair) = pairs.lock().unwrap().pop() {
+            while let Some(pair) = {
+                let mut pairs = pairs.lock().unwrap();
+                pairs.pop()
+            } {
                 let delta = delta(&images[pair.0], &images[pair.1]);
                 deltas.lock().unwrap().insert(pair, delta);
             }

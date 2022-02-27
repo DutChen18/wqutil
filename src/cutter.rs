@@ -60,7 +60,10 @@ pub fn cut_images(src: &str, dst: &str) -> (usize, usize) {
         let new = new.clone();
 
         handles.push(std::thread::spawn(move || {
-            while let Some(entry) = entries.lock().unwrap().next() {
+            while let Some(entry) = {
+                let mut entries = entries.lock().unwrap();
+                entries.next()
+            } {
                 let path = entry.unwrap().path();
                 let mut image = None;
 
