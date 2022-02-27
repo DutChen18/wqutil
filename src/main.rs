@@ -1,5 +1,5 @@
 use std::{time::SystemTime, fs, sync::Arc};
-use image::{DynamicImage, ImageBuffer, Rgb};
+use image::{DynamicImage, ImageBuffer, Rgb, GenericImage};
 
 mod cutter;
 mod cluster;
@@ -10,11 +10,11 @@ const DO_CLUSTER: bool = true;
 const RAW_PATH: &str = "raw_strips";
 const CUT_PATH: &str = "cut_strips";
 const PNG_PATH: &str = "result.png";
-// const TXT_PATH: &str = "result.txt";
-// const SCORES_PATH: &str = "scores.txt";
 
 #[tokio::main]
 async fn main() {
+    let start_time = SystemTime::now();
+
     if DO_LOAD {
         let time = SystemTime::now();
         let (total, new) = cutter::download_images(RAW_PATH).await;
@@ -48,55 +48,38 @@ async fn main() {
         vec![(0..images8.len()).collect::<Vec<_>>()]
     };
 
-    // let mut scores = BufWriter::new(File::create(SCORES_PATH).unwrap());
-    // for filename in filenames.iter() {
-    //     writeln!(scores, "{}", filename.display()).unwrap();
-    // }
-    // writeln!(scores, "").unwrap();
-
     let sorted = clusters.iter()
         .map(|cluster| {
             let time = SystemTime::now();
-            let deltas = sorter::find_deltas(&images32f, cluster);
-            println!("{} deltas computed in {:?}", deltas.len(), time.elapsed().unwrap());
+            let mut deltas = sorter::find_deltas(&images32f, cluster);
+            println!("{} deltas computed in {:.3?}", deltas.len(), time.elapsed().unwrap());
 
             let time = SystemTime::now();
-            let mut deltas = deltas.iter().collect::<Vec<_>>();
-            deltas.sort_by(|a, b| a.1.partial_cmp(b.1).unwrap());
-            println!("{} deltas sorted in {:?}", deltas.len(), time.elapsed().unwrap());
-
-            // for ((i, j), delta) in deltas.iter() {
-            //     writeln!(scores, "{} {} {}", i, j, delta).unwrap();
-            // }
-            // writeln!(scores, "").unwrap();
+            deltas.sort_by(|a, b| a.2.partial_cmp(&b.2).unwrap());
+            println!("{} deltas sorted in {:.3?}", deltas.len(), time.elapsed().unwrap());
 
             let time = SystemTime::now();
             let sorted = sorter::sort(cluster, &deltas);
-            println!("{} strips sorted in {:?}", sorted.len(), time.elapsed().unwrap());
+            println!("{} strips sorted in {:.3?}", sorted.len(), time.elapsed().unwrap());
+
             sorted
         })
         .collect::<Vec<_>>();
 
     let time = SystemTime::now();
     let width = sorted.len() + sorted.iter().map(Vec::len).sum::<usize>();
-    let mut png = ImageBuffer::<Rgb<f32>, _>::new(width as u32, images8[0].height());
-    // let mut txt = BufWriter::new(File::create(TXT_PATH).unwrap());
+    let mut png = ImageBuffer::<Rgb<u8>, _>::new(width as u32, images8[0].height());
     let mut index = 0;
 
     for cluster in sorted.iter() {
         for &strip in cluster.iter() {
-            // writeln!(txt, "{}", filenames[strip].display()).unwrap();
-            let image = &images32f[strip];
-            for (_, y, pixel) in image.enumerate_pixels() {
-                png.put_pixel(index, y, *pixel);
-            }
+            png.copy_from(&images8[strip], index, 0).unwrap();
             index += 1;
         }
-        // writeln!(txt, "").unwrap();
         index += 1;
     }
 
-    let png = DynamicImage::from(png).into_rgb8();
     png.save(PNG_PATH).unwrap();
     println!("result saved in {:.3?}", time.elapsed().unwrap());
+    println!("total time: {:.3?}", start_time.elapsed().unwrap());
 }

@@ -37,9 +37,9 @@ fn delta(a: &ImageBuffer<Rgb<f32>, Vec<f32>>, b: &ImageBuffer<Rgb<f32>, Vec<f32>
     sum / (count as f32).powf(CONFIDENCE_BONUS)
 }
 
-pub fn find_deltas(images: &Arc<Vec<ImageBuffer<Rgb<f32>, Vec<f32>>>>, indices: &[usize]) -> HashMap<(usize, usize), f32> {
+pub fn find_deltas(images: &Arc<Vec<ImageBuffer<Rgb<f32>, Vec<f32>>>>, indices: &[usize]) -> Vec<(usize, usize, f32)> {
     let pairs = Arc::new(Mutex::new(Vec::new()));
-    let deltas = Arc::new(Mutex::new(HashMap::new()));
+    let deltas = Arc::new(Mutex::new(Vec::new()));
     let mut handles = Vec::new();
 
     {
@@ -62,7 +62,7 @@ pub fn find_deltas(images: &Arc<Vec<ImageBuffer<Rgb<f32>, Vec<f32>>>>, indices: 
                 pairs.pop()
             } {
                 let delta = delta(&images[pair.0], &images[pair.1]);
-                deltas.lock().unwrap().insert(pair, delta);
+                deltas.lock().unwrap().push((pair.0, pair.1, delta));
             }
         }));
     }
@@ -75,7 +75,7 @@ pub fn find_deltas(images: &Arc<Vec<ImageBuffer<Rgb<f32>, Vec<f32>>>>, indices: 
     mem::take(&mut deltas)
 }
 
-pub fn sort(indices: &[usize], deltas: &[(&(usize, usize), &f32)]) -> Vec<usize> {
+pub fn sort(indices: &[usize], deltas: &[(usize, usize, f32)]) -> Vec<usize> {
     let mut chunks = indices.iter().map(|&i| vec![i]).collect::<Vec<_>>();
     let mut table = HashMap::new();
     let mut index = 0;
@@ -84,9 +84,9 @@ pub fn sort(indices: &[usize], deltas: &[(&(usize, usize), &f32)]) -> Vec<usize>
         table.insert(*v, (i, 0));
     }
 
-    for (&(i, j), _) in deltas {
-        let a = *table.get(&i).unwrap();
-        let b = *table.get(&j).unwrap();
+    for (i, j, _) in deltas {
+        let a = *table.get(i).unwrap();
+        let b = *table.get(j).unwrap();
         if a.0 == b.0 {
             continue;
         }

@@ -21,7 +21,7 @@ pub async fn get_links() -> Vec<String> {
 pub async fn download_images(dst: &str) -> (usize, usize) {
     let links = get_links().await;
     let client = reqwest::Client::new();
-    let new = Arc::new(AtomicUsize::new(0));
+    let new = AtomicUsize::new(0);
 
     fs::create_dir_all(dst).unwrap();
 
