@@ -1,4 +1,4 @@
-use std::{sync::{Mutex, Arc}, fs::{self, File}, path::{Path, PathBuf}, io::Write};
+use std::{sync::{Mutex, Arc, atomic::{AtomicUsize, Ordering}}, fs::{self, File}, path::{Path, PathBuf}, io::Write};
 use futures::StreamExt;
 use image::imageops::FilterType;
 
@@ -21,7 +21,7 @@ pub async fn get_links() -> Vec<String> {
 pub async fn download_images(dst: &str) -> (usize, usize) {
     let links = get_links().await;
     let client = reqwest::Client::new();
-    let new = Arc::new(Mutex::new(0));
+    let new = Arc::new(AtomicUsize::new(0));
 
     fs::create_dir_all(dst).unwrap();
 
@@ -35,22 +35,21 @@ pub async fn download_images(dst: &str) -> (usize, usize) {
                 let resp = client.get(link).send().await.unwrap();
                 let mut file = File::create(path).unwrap();
                 file.write_all(&resp.bytes().await.unwrap()).unwrap();
-                *new.lock().unwrap() += 1;
+                new.fetch_add(1, Ordering::SeqCst);
             }
         })
         .buffer_unordered(40)
         .count()
         .await;
 
-    let new = new.lock().unwrap();
-    (results, *new)
+    (results, new.load(Ordering::SeqCst))
 }
 
 pub fn cut_images(src: &str, dst: &str) -> (usize, usize) {
     let entries = Arc::new(Mutex::new(fs::read_dir(src).unwrap()));
     let mut handles = Vec::new();
-    let total = Arc::new(Mutex::new(0));
-    let new = Arc::new(Mutex::new(0));
+    let total = Arc::new(AtomicUsize::new(0));
+    let new = Arc::new(AtomicUsize::new(0));
 
     fs::create_dir_all(&dst).unwrap();
 
@@ -61,12 +60,7 @@ pub fn cut_images(src: &str, dst: &str) -> (usize, usize) {
         let new = new.clone();
 
         handles.push(std::thread::spawn(move || {
-            loop {
-                let entry = match entries.lock().unwrap().next() {
-                    Some(entry) => entry,
-                    None => break,
-                };
-
+            while let Some(entry) = entries.lock().unwrap().next() {
                 let path = entry.unwrap().path();
                 let mut image = None;
 
@@ -85,10 +79,10 @@ pub fn cut_images(src: &str, dst: &str) -> (usize, usize) {
                         let image = image.resize(10, 1033, FilterType::Nearest);
 
                         image.save(dst).unwrap();
-                        *new.lock().unwrap() += 1;
+                        new.fetch_add(1, Ordering::SeqCst);
                     }
 
-                    *total.lock().unwrap() += 1;
+                    total.fetch_add(1, Ordering::SeqCst);
                 }
             }
         }));
@@ -98,7 +92,5 @@ pub fn cut_images(src: &str, dst: &str) -> (usize, usize) {
         handle.join().unwrap();
     }
 
-    let total = total.lock().unwrap();
-    let new = new.lock().unwrap();
-    (*total, *new)
+    (total.load(Ordering::SeqCst), new.load(Ordering::SeqCst))
 }

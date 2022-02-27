@@ -1,7 +1,7 @@
 use std::{collections::HashSet};
 use image::{ImageBuffer, Rgb};
 
-pub fn cluster(images: &Vec<ImageBuffer<Rgb<u8>, Vec<u8>>>) -> Vec<Vec<usize>> {
+pub fn cluster(images: &[ImageBuffer<Rgb<u8>, Vec<u8>>]) -> Vec<Vec<usize>> {
     let mut palettes = images.iter().enumerate()
         .map(|(i, image)| (i, image.pixels().collect::<HashSet<_>>()))
         .collect::<Vec<_>>();
