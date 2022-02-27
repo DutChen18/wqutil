@@ -1,5 +1,5 @@
 use std::{sync::Mutex, collections::HashMap, mem};
-use image::{ImageBuffer, Rgb};
+use image::{ImageBuffer, Rgb, Pixel};
 
 const THREADS: usize = 6;
 
@@ -9,32 +9,29 @@ const MIN_CONFIDENCE: f32 = 0.0;
 const SQRT_COUNT: u32 = 4;
 
 fn delta(a: &ImageBuffer<Rgb<f32>, Vec<f32>>, b: &ImageBuffer<Rgb<f32>, Vec<f32>>) -> f32 {
-    let mut sum = 0.0;
     let mut count = 0;
-
-    for (pixel, other) in a.pixels().zip(b.pixels()) {
-        let mut tmp = 0.0;
-        for c in 0..3 {
-            tmp += (pixel[c] - other[c]).powi(2);
-        }
-        let mut tmp = tmp / 3.0;
-        if tmp < MAX_GRADIENT.powi(2) {
+    let sum = a.pixels().zip(b.pixels())
+        .map(|(a, b)| {
+            a.channels().iter().zip(b.channels())
+                .map(|(a, b)| (a - b).powi(2))
+                .sum::<f32>()
+        })
+        .filter(|&d| d < MAX_GRADIENT.powi(2))
+        .inspect(|_| count += 1)
+        .map(|mut d| {
             for _ in 0..SQRT_COUNT {
-                tmp = tmp.sqrt();
+                d = d.sqrt();
             }
-            sum += tmp;
-            count += 1;
-        }
-    }
+            d
+        })
+        .sum::<f32>();
 
-    if (count as f32 / a.height() as f32) < MIN_CONFIDENCE {
-        return std::f32::MAX / 2.0;
+    let confidence = count as f32 / a.height() as f32;
+    if count == 0 || confidence < MIN_CONFIDENCE {
+        f32::MAX / 2.0
+    } else {
+        sum / (count as f32).powf(CONFIDENCE_BONUS)
     }
-    if count == 0 {
-        return std::f32::MAX / 2.0;
-    }
-
-    sum / (count as f32).powf(CONFIDENCE_BONUS)
 }
 
 pub fn find_deltas(images: &[ImageBuffer<Rgb<f32>, Vec<f32>>], indices: &[usize]) -> Vec<(usize, usize, f32)> {
