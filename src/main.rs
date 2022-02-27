@@ -1,4 +1,4 @@
-use std::{time::SystemTime, fs, sync::Arc};
+use std::{time::SystemTime, fs};
 use image::{DynamicImage, ImageBuffer, Rgb, GenericImage};
 
 mod cutter;
@@ -33,16 +33,17 @@ async fn main() {
         .map(|entry| image::open(entry).unwrap())
         .map(|image| image.into_rgb8())
         .collect::<Vec<_>>();
-    let images32f = Arc::new(images8.iter()
+    let images32f = images8.iter()
         .map(|image| DynamicImage::from(image.clone()))
         .map(|image| image.into_rgb32f())
-        .collect::<Vec<_>>());
+        .collect::<Vec<_>>();
     println!("{} strips loaded in {:.3?}", images8.len(), time.elapsed().unwrap());
 
     let clusters = if DO_CLUSTER {
         let time = SystemTime::now();
         let clusters = cluster::cluster(&images8);
         println!("{} clusters found in {:.3?}", clusters.len(), time.elapsed().unwrap());
+        
         clusters
     } else {
         vec![(0..images8.len()).collect::<Vec<_>>()]

@@ -1,4 +1,4 @@
-use std::{sync::{Mutex, Arc, atomic::{AtomicUsize, Ordering}}, fs::{self, File}, path::{Path, PathBuf}, io::Write};
+use std::{sync::{Mutex, atomic::{AtomicUsize, Ordering}}, fs::{self, File}, path::{Path, PathBuf}, io::Write};
 use futures::StreamExt;
 use image::imageops::FilterType;
 
@@ -46,54 +46,47 @@ pub async fn download_images(dst: &str) -> (usize, usize) {
 }
 
 pub fn cut_images(src: &str, dst: &str) -> (usize, usize) {
-    let entries = Arc::new(Mutex::new(fs::read_dir(src).unwrap()));
-    let mut handles = Vec::new();
-    let total = Arc::new(AtomicUsize::new(0));
-    let new = Arc::new(AtomicUsize::new(0));
+    let entries = Mutex::new(fs::read_dir(src).unwrap());
+    let total = AtomicUsize::new(0);
+    let new = AtomicUsize::new(0);
+    let dst = PathBuf::from(dst);
 
     fs::create_dir_all(&dst).unwrap();
 
-    for _ in 0..THREADS {
-        let entries = entries.clone();
-        let dst = PathBuf::from(dst);
-        let total = total.clone();
-        let new = new.clone();
-
-        handles.push(std::thread::spawn(move || {
-            while let Some(entry) = {
-                let mut entries = entries.lock().unwrap();
-                entries.next()
-            } {
-                let path = entry.unwrap().path();
-                let mut image = None;
-
-                for i in 0..5 {
-                    let name = format!("{}-{}", path.file_stem().unwrap().to_str().unwrap(), i);
-                    let dst = dst.join(name).with_extension(path.extension().unwrap());
-
-                    if !dst.exists() {
-                        let image = if let Some(ref image) = image {
-                            image
-                        } else {
-                            image.insert(image::open(&path).unwrap())
-                        };
-
-                        let image = image.crop_imm(200 + i * 210, 103, 10, 10330);
-                        let image = image.resize(10, 1033, FilterType::Nearest);
-
-                        image.save(dst).unwrap();
-                        new.fetch_add(1, Ordering::SeqCst);
+    crossbeam::scope(|s| {
+        for _ in 0..THREADS {
+            s.spawn(|_| {
+                while let Some(entry) = {
+                    let mut entries = entries.lock().unwrap();
+                    entries.next()
+                } {
+                    let path = entry.unwrap().path();
+                    let mut image = None;
+    
+                    for i in 0..5 {
+                        let name = format!("{}-{}", path.file_stem().unwrap().to_str().unwrap(), i);
+                        let dst = dst.join(name).with_extension(path.extension().unwrap());
+    
+                        if !dst.exists() {
+                            let image = if let Some(ref image) = image {
+                                image
+                            } else {
+                                image.insert(image::open(&path).unwrap())
+                            };
+    
+                            let image = image.crop_imm(200 + i * 210, 103, 10, 10330);
+                            let image = image.resize(10, 1033, FilterType::Nearest);
+    
+                            image.save(dst).unwrap();
+                            new.fetch_add(1, Ordering::SeqCst);
+                        }
+    
+                        total.fetch_add(1, Ordering::SeqCst);
                     }
-
-                    total.fetch_add(1, Ordering::SeqCst);
                 }
-            }
-        }));
-    }
-
-    for handle in handles {
-        handle.join().unwrap();
-    }
+            });
+        }
+    }).unwrap();
 
     (total.load(Ordering::SeqCst), new.load(Ordering::SeqCst))
 }

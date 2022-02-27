@@ -13,12 +13,14 @@ pub fn cluster(images: &[ImageBuffer<Rgb<u8>, Vec<u8>>]) -> Vec<Vec<usize>> {
 
     for (index, palette) in palettes {
         let mut done = false;
+
         for (cluster, target) in clusters.iter_mut() {
             if palette.is_subset(target) {
                 cluster.push(index);
                 done = true;
             }
         }
+        
         if !done {
             clusters.push((vec![index], palette));
         }

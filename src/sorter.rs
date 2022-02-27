@@ -1,4 +1,4 @@
-use std::{sync::{Arc, Mutex}, collections::HashMap, mem};
+use std::{sync::Mutex, collections::HashMap, mem};
 use image::{ImageBuffer, Rgb};
 
 const THREADS: usize = 6;
@@ -37,10 +37,9 @@ fn delta(a: &ImageBuffer<Rgb<f32>, Vec<f32>>, b: &ImageBuffer<Rgb<f32>, Vec<f32>
     sum / (count as f32).powf(CONFIDENCE_BONUS)
 }
 
-pub fn find_deltas(images: &Arc<Vec<ImageBuffer<Rgb<f32>, Vec<f32>>>>, indices: &[usize]) -> Vec<(usize, usize, f32)> {
-    let pairs = Arc::new(Mutex::new(Vec::new()));
-    let deltas = Arc::new(Mutex::new(Vec::new()));
-    let mut handles = Vec::new();
+pub fn find_deltas(images: &[ImageBuffer<Rgb<f32>, Vec<f32>>], indices: &[usize]) -> Vec<(usize, usize, f32)> {
+    let pairs = Mutex::new(Vec::new());
+    let deltas = Mutex::new(Vec::new());
 
     {
         let mut pairs = pairs.lock().unwrap();
@@ -51,25 +50,19 @@ pub fn find_deltas(images: &Arc<Vec<ImageBuffer<Rgb<f32>, Vec<f32>>>>, indices: 
         }
     }
 
-    for _ in 0..THREADS {
-        let images = images.clone();
-        let deltas = deltas.clone();
-        let pairs = pairs.clone();
-
-        handles.push(std::thread::spawn(move || {
-            while let Some(pair) = {
-                let mut pairs = pairs.lock().unwrap();
-                pairs.pop()
-            } {
-                let delta = delta(&images[pair.0], &images[pair.1]);
-                deltas.lock().unwrap().push((pair.0, pair.1, delta));
-            }
-        }));
-    }
-
-    for handle in handles {
-        handle.join().unwrap();
-    }
+    crossbeam::scope(|s| {
+        for _ in 0..THREADS {
+            s.spawn(|_| {
+                while let Some(pair) = {
+                    let mut pairs = pairs.lock().unwrap();
+                    pairs.pop()
+                } {
+                    let delta = delta(&images[pair.0], &images[pair.1]);
+                    deltas.lock().unwrap().push((pair.0, pair.1, delta));
+                }
+            });
+        }
+    }).unwrap();
 
     let mut deltas = deltas.lock().unwrap();
     mem::take(&mut deltas)
