@@ -19,7 +19,7 @@ async fn main() {
         let (total, new) = cutter::cut_images(config::RAW_PATH, config::CUT_PATH);
         println!("{} images cut ({} total) in {:.3?}", new, total, time.elapsed().unwrap());
 
-        if new == 0 {
+        if new == 0 && !config::FORCE_SORT {
             return;
         }
     }

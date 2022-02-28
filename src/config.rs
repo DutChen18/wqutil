@@ -1,6 +1,8 @@
 /* main.rs */
 pub const DO_LOAD: bool = true;
 pub const DO_CLUSTER: bool = true;
+pub const FORCE_SORT: bool = false;
+
 pub const RAW_PATH: &str = "raw_strips";
 pub const CUT_PATH: &str = "cut_strips";
 pub const PNG_PATH: &str = "result.png";
