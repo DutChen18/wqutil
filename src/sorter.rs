@@ -1,12 +1,6 @@
 use std::{sync::Mutex, collections::HashMap, mem};
 use image::{ImageBuffer, Rgb, Pixel};
-
-const THREADS: usize = 6;
-
-const MAX_GRADIENT: f32 = 1.0;
-const CONFIDENCE_BONUS: f32 = 1.0;
-const MIN_CONFIDENCE: f32 = 0.0;
-const SQRT_COUNT: u32 = 4;
+use crate::config;
 
 fn delta(a: &ImageBuffer<Rgb<f32>, Vec<f32>>, b: &ImageBuffer<Rgb<f32>, Vec<f32>>) -> f32 {
     let mut count = 0;
@@ -16,10 +10,10 @@ fn delta(a: &ImageBuffer<Rgb<f32>, Vec<f32>>, b: &ImageBuffer<Rgb<f32>, Vec<f32>
                 .map(|(a, b)| (a - b).powi(2))
                 .sum::<f32>().sqrt() / 3f32.sqrt()
         })
-        .filter(|&d| d < MAX_GRADIENT)
+        .filter(|&d| d < config::MAX_GRADIENT)
         .inspect(|_| count += 1)
         .map(|mut d| {
-            for _ in 0..SQRT_COUNT {
+            for _ in 0..config::SQRT_COUNT {
                 d = d.sqrt();
             }
             d
@@ -27,10 +21,10 @@ fn delta(a: &ImageBuffer<Rgb<f32>, Vec<f32>>, b: &ImageBuffer<Rgb<f32>, Vec<f32>
         .sum::<f32>();
 
     let confidence = count as f32 / a.height() as f32;
-    if count == 0 || confidence < MIN_CONFIDENCE {
+    if count == 0 || confidence < config::MIN_CONFIDENCE {
         f32::MAX / 2.0
     } else {
-        sum / (count as f32).powf(CONFIDENCE_BONUS)
+        sum / (count as f32).powf(config::CONFIDENCE_BONUS)
     }
 }
 
@@ -48,7 +42,7 @@ pub fn find_deltas(images: &[ImageBuffer<Rgb<f32>, Vec<f32>>], indices: &[usize]
     }
 
     crossbeam::scope(|s| {
-        for _ in 0..THREADS {
+        for _ in 0..config::SORT_THREADS {
             s.spawn(|_| {
                 while let Some(pair) = {
                     let mut pairs = pairs.lock().unwrap();

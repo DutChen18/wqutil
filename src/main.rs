@@ -4,29 +4,28 @@ use image::{DynamicImage, ImageBuffer, Rgb, GenericImage};
 mod cutter;
 mod cluster;
 mod sorter;
-
-const DO_LOAD: bool = true;
-const DO_CLUSTER: bool = true;
-const RAW_PATH: &str = "raw_strips";
-const CUT_PATH: &str = "cut_strips";
-const PNG_PATH: &str = "result.png";
+mod config;
 
 #[tokio::main]
 async fn main() {
     let start_time = SystemTime::now();
 
-    if DO_LOAD {
+    if config::DO_LOAD {
         let time = SystemTime::now();
-        let (total, new) = cutter::download_images(RAW_PATH).await;
+        let (total, new) = cutter::download_images(config::RAW_PATH).await;
         println!("{} images downloaded ({} total) in {:.3?}", new, total, time.elapsed().unwrap());
     
         let time = SystemTime::now();
-        let (total, new) = cutter::cut_images(RAW_PATH, CUT_PATH);
+        let (total, new) = cutter::cut_images(config::RAW_PATH, config::CUT_PATH);
         println!("{} images cut ({} total) in {:.3?}", new, total, time.elapsed().unwrap());
+
+        if new == 0 {
+            return;
+        }
     }
 
     let time = SystemTime::now();
-    let filenames = fs::read_dir(CUT_PATH).unwrap()
+    let filenames = fs::read_dir(config::CUT_PATH).unwrap()
         .map(|entry| entry.unwrap().path())
         .collect::<Vec<_>>();
     let images8 = filenames.iter()
@@ -39,7 +38,7 @@ async fn main() {
         .collect::<Vec<_>>();
     println!("{} strips loaded in {:.3?}", images8.len(), time.elapsed().unwrap());
 
-    let clusters = if DO_CLUSTER {
+    let clusters = if config::DO_CLUSTER {
         let time = SystemTime::now();
         let clusters = cluster::cluster(&images8);
         println!("{} clusters found in {:.3?}", clusters.len(), time.elapsed().unwrap());
@@ -80,7 +79,7 @@ async fn main() {
         index += 1;
     }
 
-    png.save(PNG_PATH).unwrap();
+    png.save(config::PNG_PATH).unwrap();
     println!("result saved in {:.3?}", time.elapsed().unwrap());
     println!("total time: {:.3?}", start_time.elapsed().unwrap());
 }

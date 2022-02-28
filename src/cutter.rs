@@ -1,8 +1,7 @@
 use std::{sync::{Mutex, atomic::{AtomicUsize, Ordering}}, fs::{self, File}, path::{Path, PathBuf}, io::Write};
 use futures::StreamExt;
 use image::imageops::FilterType;
-
-const THREADS: usize = 6;
+use crate::config;
 
 pub async fn get_links() -> Vec<String> {
     const PATH: &str = "https://docs.google.com/spreadsheets/d/1Y4qoXTpd0ZO2CRZzgYV3Lvd1Aihui_Ya6p0V89nKdNU/gviz/tq?tqx=out:csv&sheet=Unique%20Codes";
@@ -54,7 +53,7 @@ pub fn cut_images(src: &str, dst: &str) -> (usize, usize) {
     fs::create_dir_all(&dst).unwrap();
 
     crossbeam::scope(|s| {
-        for _ in 0..THREADS {
+        for _ in 0..config::CUTTER_THREADS {
             s.spawn(|_| {
                 while let Some(entry) = {
                     let mut entries = entries.lock().unwrap();
