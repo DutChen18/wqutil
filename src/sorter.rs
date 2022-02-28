@@ -14,9 +14,9 @@ fn delta(a: &ImageBuffer<Rgb<f32>, Vec<f32>>, b: &ImageBuffer<Rgb<f32>, Vec<f32>
         .map(|(a, b)| {
             a.channels().iter().zip(b.channels())
                 .map(|(a, b)| (a - b).powi(2))
-                .sum::<f32>() / a.channels().len() as f32
+                .sum::<f32>().sqrt() / 3f32.sqrt()
         })
-        .filter(|&d| d < MAX_GRADIENT.powi(2))
+        .filter(|&d| d < MAX_GRADIENT)
         .inspect(|_| count += 1)
         .map(|mut d| {
             for _ in 0..SQRT_COUNT {
