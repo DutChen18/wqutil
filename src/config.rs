@@ -15,4 +15,4 @@ pub const SORT_THREADS: usize = 6;
 pub const MAX_GRADIENT: f32 = 1.0;
 pub const CONFIDENCE_BONUS: f32 = 1.0;
 pub const MIN_CONFIDENCE: f32 = 0.0;
-pub const SQRT_COUNT: u32 = 4;
+pub const SQRT_COUNT: u32 = 6;

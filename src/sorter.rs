@@ -8,9 +8,9 @@ fn delta(a: &ImageBuffer<Rgb<f32>, Vec<f32>>, b: &ImageBuffer<Rgb<f32>, Vec<f32>
         .map(|(a, b)| {
             a.channels().iter().zip(b.channels())
                 .map(|(a, b)| (a - b).powi(2))
-                .sum::<f32>().sqrt() / 3f32.sqrt()
+                .sum::<f32>()
         })
-        .filter(|&d| d < config::MAX_GRADIENT)
+        .filter(|&d| d < config::MAX_GRADIENT * 3f32)
         .inspect(|_| count += 1)
         .map(|mut d| {
             for _ in 0..config::SQRT_COUNT {
